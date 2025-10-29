@@ -4,7 +4,7 @@ import Cookies from 'js-cookie';
 const baseApis = createApi({
     reducerPath: 'api',
     baseQuery: fetchBaseQuery({
-        baseUrl:'http://192.168.0.100:3000/api/v1',
+        baseUrl:'http://192.168.0.102:3000/api/v1',
         prepareHeaders: (headers) => {
             const token = Cookies.get('accessToken');
             if (token) {
@@ -13,7 +13,7 @@ const baseApis = createApi({
             return headers;
         },
     }),
-    tagTypes: ['profile'],
+    tagTypes: ['profile','projects'],
     endpoints: () => ({}),
 });
 
