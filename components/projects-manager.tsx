@@ -1,70 +1,109 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Trash2, Plus } from "lucide-react"
+import { useState } from "react"
+import { Trash2, Plus, Loader2 } from "lucide-react"
+import {
+  useGetProjectsQuery,
+  useCreateProjectMutation,
+  useUpdateProjectMutation,
+  useDeleteProjectMutation,
+} from "@/app/providers/service/projectApis"
 
 interface Project {
-  id: string
+  _id?: string
   title: string
   subtitle: string
   description: string
   technologies: string[]
   githubLink: string
   liveLink: string
-  coverImage: string
-  images: string[]
+  coverImage: File | null
+  images: File[]
   category: string
   features: string[]
 }
 
 export default function ProjectsManager() {
-  const [projects, setProjects] = useState<Project[]>([])
+  const { data: projectsData, isLoading, refetch } = useGetProjectsQuery({})
+  const [createProject, { isLoading: creating }] = useCreateProjectMutation()
+  const [updateProject, { isLoading: updating }] = useUpdateProjectMutation()
+  const [deleteProject, { isLoading: deleting }] = useDeleteProjectMutation()
+
   const [newProject, setNewProject] = useState<Project>({
-    id: "",
     title: "",
     subtitle: "",
     description: "",
     technologies: [],
     githubLink: "",
     liveLink: "",
-    coverImage: "",
+    coverImage: null,
     images: [],
     category: "",
     features: [],
   })
+
   const [techInput, setTechInput] = useState("")
   const [featureInput, setFeatureInput] = useState("")
 
-  useEffect(() => {
-    const savedProjects = localStorage.getItem("projects")
-    if (savedProjects) setProjects(JSON.parse(savedProjects))
-  }, [])
+  // ------------------ Handlers ------------------
 
-  const handleAddProject = () => {
-    if (!newProject.title.trim()) return
-    const project = { ...newProject, id: Date.now().toString() }
-    const updatedProjects = [...projects, project]
-    setProjects(updatedProjects)
-    localStorage.setItem("projects", JSON.stringify(updatedProjects))
-    setNewProject({
-      id: "",
-      title: "",
-      subtitle: "",
-      description: "",
-      technologies: [],
-      githubLink: "",
-      liveLink: "",
-      coverImage: "",
-      images: [],
-      category: "",
-      features: [],
-    })
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: "coverImage" | "images") => {
+    if (!e.target.files) return
+    if (field === "coverImage") {
+      setNewProject({ ...newProject, coverImage: e.target.files[0] })
+    } else {
+      setNewProject({ ...newProject, images: [...newProject.images, ...Array.from(e.target.files)] })
+    }
   }
 
-  const handleDeleteProject = (id: string) => {
-    const updatedProjects = projects.filter((project) => project.id !== id)
-    setProjects(updatedProjects)
-    localStorage.setItem("projects", JSON.stringify(updatedProjects))
+  const handleAddProject = async () => {
+    if (!newProject.title.trim() || !newProject.description.trim()) return alert("Title and Description are required")
+
+    const formData = new FormData()
+    formData.append("title", newProject.title)
+    formData.append("subtitle", newProject.subtitle)
+    formData.append("description", newProject.description)
+    formData.append("githubLink", newProject.githubLink)
+    formData.append("liveLink", newProject.liveLink)
+    formData.append("category", "68f8f81e4e78cbb121968677")
+    newProject.technologies.forEach((tech) => formData.append("technologies", tech))
+    newProject.features.forEach((feature) => formData.append("features", feature))
+    console.log(newProject.coverImage , "=============images",newProject.images)
+    if (newProject.coverImage) formData.append("coverImage", newProject.coverImage)
+    newProject.images.forEach((file) => formData.append("images", file))
+
+    try {
+      await createProject({ data: formData }).unwrap()
+      setNewProject({
+        title: "",
+        subtitle: "",
+        description: "",
+        technologies: [],
+        githubLink: "",
+        liveLink: "",
+        coverImage: null,
+        images: [],
+        category: "",
+        features: [],
+      })
+      refetch()
+      alert("✅ Project created successfully!")
+    } catch (err) {
+      console.error(err)
+      alert("❌ Failed to create project.")
+    }
+  }
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this project?")) return
+    try {
+      await deleteProject({ id }).unwrap()
+      refetch()
+      alert("🗑️ Project deleted successfully!")
+    } catch (err) {
+      console.error(err)
+      alert("❌ Failed to delete project.")
+    }
   }
 
   const addTechnology = () => {
@@ -101,92 +140,71 @@ export default function ProjectsManager() {
     })
   }
 
+  // ------------------ UI ------------------
+
   return (
     <div className="space-y-6">
-      <div>
+      <header>
         <h1 className="text-3xl font-bold text-primary mb-2">PROJECTS MANAGEMENT</h1>
         <p className="text-foreground/60">Showcase your portfolio projects</p>
-      </div>
+      </header>
 
-      {/* Add New Project */}
-      <div className="bg-card border border-border/50 rounded-md shadow-xl p-6 space-y-4">
+      {/* ADD NEW PROJECT */}
+      <section className="bg-card border border-border/50 rounded-md shadow-xl p-6 space-y-4">
         <h2 className="text-xl font-bold text-accent">ADD NEW PROJECT</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">Project Title</label>
-            <input
-              type="text"
-              value={newProject.title}
-              onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="Project name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">Subtitle</label>
-            <input
-              type="text"
-              value={newProject.subtitle}
-              onChange={(e) => setNewProject({ ...newProject, subtitle: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="Short description"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">Category</label>
-            <input
-              type="text"
-              value={newProject.category}
-              onChange={(e) => setNewProject({ ...newProject, category: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="e.g., Web App"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">Cover Image URL</label>
-            <input
-              type="url"
-              value={newProject.coverImage}
-              onChange={(e) => setNewProject({ ...newProject, coverImage: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="https://..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">GitHub Link</label>
-            <input
-              type="url"
-              value={newProject.githubLink}
-              onChange={(e) => setNewProject({ ...newProject, githubLink: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="https://github.com/..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-foreground/80 mb-2">Live Link</label>
-            <input
-              type="url"
-              value={newProject.liveLink}
-              onChange={(e) => setNewProject({ ...newProject, liveLink: e.target.value })}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full"
-              placeholder="https://..."
-            />
-          </div>
+          {[
+            { label: "Project Title", value: newProject.title, field: "title" },
+            { label: "Subtitle", value: newProject.subtitle, field: "subtitle" },
+            { label: "Category", value: newProject.category, field: "category" },
+            { label: "GitHub Link", value: newProject.githubLink, field: "githubLink" },
+            { label: "Live Link", value: newProject.liveLink, field: "liveLink" },
+          ].map(({ label, value, field }) => (
+            <div key={field}>
+              <label className="block text-sm font-medium text-foreground/80 mb-2">{label}</label>
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => setNewProject({ ...newProject, [field]: e.target.value })}
+                className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 w-full focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all"
+                placeholder={label}
+              />
+            </div>
+          ))}
         </div>
 
+        {/* COVER IMAGE */}
+        <div>
+          <label className="block text-sm font-medium text-foreground/80 mb-2">Cover Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "coverImage")}
+            className="block w-full text-sm text-foreground/70"
+          />
+        </div>
+
+        {/* IMAGES */}
+        <div>
+          <label className="block text-sm font-medium text-foreground/80 mb-2">Additional Images</label>
+          <input
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={(e) => handleFileChange(e, "images")}
+            className="block w-full text-sm text-foreground/70"
+          />
+        </div>
+
+        {/* DESCRIPTION */}
         <div>
           <label className="block text-sm font-medium text-foreground/80 mb-2">Description</label>
           <textarea
             value={newProject.description}
             onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-            className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all w-full h-24 resize-none"
-            placeholder="Project description..."
+            className="bg-input border border-border/50 text-foreground rounded-md px-3 py-2 w-full focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all h-24 resize-none"
+            placeholder="Describe your project..."
           />
         </div>
 
@@ -198,25 +216,28 @@ export default function ProjectsManager() {
               type="text"
               value={techInput}
               onChange={(e) => setTechInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && addTechnology()}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all flex-1"
+              onKeyDown={(e) => e.key === "Enter" && addTechnology()}
               placeholder="Add technology..."
+              className="flex-1 bg-input border border-border/50 text-foreground rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all"
             />
-            <button onClick={addTechnology} className="cyber-button bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50">
+            <button
+              onClick={addTechnology}
+              className="cyber-button bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50"
+            >
               Add
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {newProject.technologies.map((tech, index) => (
-              <div
-                key={index}
-                className="bg-primary/20 border border-primary/50 rounded-md px-3 py-1 flex items-center gap-2"
+            {newProject.technologies.map((tech, i) => (
+              <span
+                key={i}
+                className="bg-primary/20 border border-primary/50 rounded-md px-3 py-1 text-sm flex items-center gap-2"
               >
-                <span className="text-sm">{tech}</span>
-                <button onClick={() => removeTechnology(index)} className="text-primary hover:text-primary/80">
+                {tech}
+                <button onClick={() => removeTechnology(i)} className="text-primary hover:text-primary/70">
                   ×
                 </button>
-              </div>
+              </span>
             ))}
           </div>
         </div>
@@ -229,62 +250,72 @@ export default function ProjectsManager() {
               type="text"
               value={featureInput}
               onChange={(e) => setFeatureInput(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && addFeature()}
-              className="bg-input border border-border/50 text-foreground placeholder-foreground/40 rounded-md px-3 py-2 focus:outline-none focus:border-primary focus:shadow-lg focus:shadow-primary/30 transition-all flex-1"
+              onKeyDown={(e) => e.key === "Enter" && addFeature()}
               placeholder="Add feature..."
+              className="flex-1 bg-input border border-border/50 text-foreground rounded-md px-3 py-2 focus:outline-none focus:border-accent focus:shadow-lg focus:shadow-accent/30 transition-all"
             />
-            <button onClick={addFeature} className="cyber-button bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50">
+            <button
+              onClick={addFeature}
+              className="cyber-button bg-accent text-accent-foreground hover:bg-accent/90 hover:shadow-lg hover:shadow-accent/50"
+            >
               Add
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {newProject.features.map((feature, index) => (
-              <div
-                key={index}
-                className="bg-accent/20 border border-accent/50 rounded-md px-3 py-1 flex items-center gap-2"
+            {newProject.features.map((feature, i) => (
+              <span
+                key={i}
+                className="bg-accent/20 border border-accent/50 rounded-md px-3 py-1 text-sm flex items-center gap-2"
               >
-                <span className="text-sm">{feature}</span>
-                <button onClick={() => removeFeature(index)} className="text-accent hover:text-accent/80">
+                {feature}
+                <button onClick={() => removeFeature(i)} className="text-accent hover:text-accent/70">
                   ×
                 </button>
-              </div>
+              </span>
             ))}
           </div>
         </div>
 
         <button
+          disabled={creating}
           onClick={handleAddProject}
           className="cyber-button bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 w-full flex items-center justify-center gap-2"
         >
-          <Plus size={18} />
-          Add Project
+          {creating ? <Loader2 className="animate-spin" size={18} /> : <Plus size={18} />}
+          {creating ? "Creating..." : "Add Project"}
         </button>
-      </div>
+      </section>
 
-      {/* Projects List */}
-      <div className="space-y-3">
+      {/* PROJECTS LIST */}
+      <section className="space-y-3">
         <h2 className="text-xl font-bold text-accent">YOUR PROJECTS</h2>
-        {projects.length === 0 ? (
-          <div className="bg-card border border-border/50 rounded-md shadow-xl p-6 text-center text-foreground/60">No projects added yet</div>
+
+        {isLoading ? (
+          <div className="text-center text-foreground/60">Loading projects...</div>
+        ) : projectsData?.data?.length === 0 ? (
+          <div className="bg-card border border-border/50 rounded-md shadow-xl p-6 text-center text-foreground/60">
+            No projects added yet
+          </div>
         ) : (
-          projects.map((project) => (
-            <div key={project.id} className="bg-card border border-border/50 rounded-md shadow-xl p-4">
+          projectsData?.data?.map((project: any) => (
+            <div key={project._id} className="bg-card border border-border/50 rounded-md shadow-xl p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <p className="font-bold text-primary">{project.title}</p>
                   <p className="text-sm text-foreground/60">{project.subtitle}</p>
                 </div>
                 <button
-                  onClick={() => handleDeleteProject(project.id)}
+                  disabled={deleting}
+                  onClick={() => handleDeleteProject(project._id)}
                   className="p-2 hover:bg-destructive/10 rounded-md transition-colors text-destructive"
                 >
-                  <Trash2 size={18} />
+                  {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={18} />}
                 </button>
               </div>
               <p className="text-sm text-foreground/70 mb-3">{project.description}</p>
               <div className="flex flex-wrap gap-2">
-                {project.technologies.map((tech, index) => (
-                  <span key={index} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
+                {project.technologies?.map((tech: string, i: number) => (
+                  <span key={i} className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
                     {tech}
                   </span>
                 ))}
@@ -292,7 +323,7 @@ export default function ProjectsManager() {
             </div>
           ))
         )}
-      </div>
+      </section>
     </div>
   )
 }
